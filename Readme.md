@@ -44,7 +44,7 @@
 
 3. **Run**  
    ```bash
-   cd backend && node app.js       # Backend
+   cd backend && node app.js  # Backend
    cd ..
    cd frontend && npm start  # Frontend
    ```
