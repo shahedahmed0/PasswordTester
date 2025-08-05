@@ -29,7 +29,7 @@
 
 1. **Clone & Install**  
    ```bash
-   git clone git@github.com:shahedahmed0/PasswordTester.git
+   git clone https://github.com/shahedahmed0/PasswordTester.git
    cd PasswordTester
    npm install
    cd frontend && npm install
