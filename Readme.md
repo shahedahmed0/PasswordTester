@@ -27,20 +27,29 @@
 
 ## 🚀 Quick Start
 
-1. **Install dependencies**
+1. **Clone & Install**  
    ```bash
+   git clone git@github.com:shahedahmed0/PasswordTester.git
+   cd PasswordTester
    npm install
+   cd frontend && npm install
+   ```
 
-2. **Configure environment**
-   ```bash
-   cp .env.mongodb+srv://burnedwanderer:404051@passwordapp.gfveem3.mongodb.net/?retryWrites=true&w=majority&appName=PasswordApp .env
+2. **Configure Environment**  
+   Create `.env` with:
+   ```env
+   MONGODB_URI=mongodb+srv://burnedwanderer:404051@passwordapp.gfveem3.mongodb.net/?retryWrites=true&w=majority&appName=PasswordApp
+   PORT=5000
+   ```
 
-3. **Run the app**
+3. **Run**  
    ```bash
-   npm run dev
+   npm start       # Backend
+   cd frontend && npm start  # Frontend
    ```
    - Frontend: `http://localhost:3000`
    - Backend: `http://localhost:5000`
+
 
 
 ## 🛡️ Technical Stack
