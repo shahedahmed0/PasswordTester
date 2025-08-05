@@ -11,7 +11,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://shahedahmed:mongo@passwordapp.gfveem3.mongodb.net/?retryWrites=true&w=majority&appName=PasswordApp';
+const MONGO_URI = process.env.MONGODB_URI || 'mongodb+srv://burnedwanderer:404051@passwordapp.gfveem3.mongodb.net/?retryWrites=true&w=majority&appName=PasswordApp';
 
 mongoose.connect(MONGO_URI, {
   retryWrites: true,
