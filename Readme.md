@@ -44,7 +44,8 @@
 
 3. **Run**  
    ```bash
-   node app.js       # Backend
+   cd backend && node app.js       # Backend
+   cd ..
    cd frontend && npm start  # Frontend
    ```
    - Frontend: `http://localhost:3000`
