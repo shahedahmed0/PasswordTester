@@ -75,22 +75,61 @@ app.post('/api/check-strength', async (req, res) => {
     const result = zxcvbn(password);
     const strengthLabel = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'][isCommon ? 0 : result.score];
 
+    // Meme feedback based on score
+    const getMemeFeedback = (score, isCommon) => {
+      if (isCommon) {
+        return {
+          meme: 'https://media.giphy.com/media/LMN7qL2BpE9vW/giphy.gif',
+          text: 'Seriously? This password is more common than pineapple on pizza! 🍍'
+        };
+      }
+
+      const memes = [
+        { // Score 0 - Very Weak
+          meme: 'memes/QoZunxgU0Z1i8.gif',
+          text: 'Your password is weaker than my grandma\'s tea! ☕'
+        },
+        { // Score 1 - Weak
+          meme: 'memes/M2qCVgOKaSNLG.gif',
+          text: 'This password wouldn\'t protect a chocolate from a toddler! 🍫'
+        },
+        { // Score 2 - Fair
+          meme: 'memes/3dkXFcZgXEu9noZQCE.gif',
+          text: 'Not bad... but not great either. Like lukewarm coffee. ☕'
+        },
+        { // Score 3 - Strong
+          meme: 'memes/uim459G9DiGQXDv8zt.gif',
+          text: 'Now we\'re talking! This password means business! 💼'
+        },
+        { // Score 4 - Very Strong
+          meme: 'memes/rCByhKpqKDZErtLDzm.gif',
+          text: 'UNBREAKABLE! This password could guard the Crown Jewels! 👑'
+        }
+      ];
+
+      return memes[score];
+    };
+
+    const memeFeedback = getMemeFeedback(isCommon ? 0 : result.score, isCommon);
+
     await PasswordTest.create({
       strengthScore: isCommon ? 0 : result.score,
       isCommon,
       strengthLabel,
       feedback: isCommon ?
-      'Common password detected' :
-      result.feedback.suggestions.join(' ') || 'Good password!'
+        'Common password detected' :
+        result.feedback.suggestions.join(' ') || 'Good password!'
     });
 
     res.json({
       strength: strengthLabel,
       score: isCommon ? 0 : result.score,
       isCommon,
-      feedback: isCommon
-      ? 'This password is too common and easily guessable'
-      : result.feedback.suggestions.join(' ') || 'Good password!'
+      feedback: isCommon ?
+        'This password is too common and easily guessable' :
+        result.feedback.suggestions.join(' ') || 'Good password!',
+      meme: memeFeedback.meme,
+      memeText: memeFeedback.text
     });
 
   } catch (err) {
