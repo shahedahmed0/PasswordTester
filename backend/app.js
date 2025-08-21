@@ -79,7 +79,7 @@ app.post('/api/check-strength', async (req, res) => {
     const getMemeFeedback = (score, isCommon) => {
       if (isCommon) {
         return {
-          meme: 'https://media.giphy.com/media/LMN7qL2BpE9vW/giphy.gif',
+          meme: 'memes/vwI4mYEHP8k0w.gif',
           text: 'Seriously? This password is more common than pineapple on pizza! 🍍'
         };
       }
