@@ -26,9 +26,11 @@ mongoose.connect(MONGO_URI, {
 const PasswordTestSchema = new mongoose.Schema({
   strengthScore: { type: Number, required: true },
   isCommon: Boolean,
+  rarityScore: Number,
   testedAt: { type: Date, default: Date.now },
   strengthLabel: String,
-  feedback: String
+  feedback: String,
+  rarityLabel: String
 });
 
 const AdminTokenSchema = new mongoose.Schema({
@@ -63,6 +65,65 @@ async function initializeData() {
   }
 }
 
+function analyzePasswordRarity(password) {
+  if (!password || password.length === 0) {
+    return { score: 0, label: 'No password' };
+  }
+
+  let score = 0;
+  let feedback = [];
+
+  if (password.length >= 16) score += 3;
+  else if (password.length >= 12) score += 2;
+  else if (password.length >= 8) score += 1;
+
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumbers = /[0-9]/.test(password);
+  const hasSpecialChars = /[^A-Za-z0-9]/.test(password);
+
+  const charTypesCount = [hasUpperCase, hasLowerCase, hasNumbers, hasSpecialChars]
+  .filter(Boolean).length;
+
+  score += charTypesCount;
+
+  const commonPatterns = [
+    /^123/, /^qwert/, /^asdf/, /^password/, /^admin/, /^welcome/, /^login/,
+    /^\d+$/,
+    /^[a-zA-Z]+$/,
+    /(.)\1{2,}/,
+    /(abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)/i,
+    /(012|123|234|345|456|567|678|789|890)/
+  ];
+
+  let patternCount = 0;
+  commonPatterns.forEach(pattern => {
+    if (pattern.test(password)) {
+      patternCount++;
+      feedback.push(`Contains common pattern: ${pattern.toString()}`);
+    }
+  });
+
+  score = Math.max(0, score - patternCount);
+
+  const dictionaryWords = password.split(/[^a-zA-Z]/).filter(word => word.length > 3);
+  if (dictionaryWords.length > 0) {
+    score = Math.max(0, score - 1);
+    feedback.push('Contains dictionary words');
+  }
+
+  score = Math.min(5, Math.max(0, score));
+
+  let label;
+  if (score >= 4) label = 'Very Rare';
+  else if (score >= 3) label = 'Rare';
+  else if (score >= 2) label = 'Uncommon';
+  else if (score >= 1) label = 'Common';
+  else label = 'Very Common';
+
+  return { score, label, feedback };
+}
+
 app.post('/api/check-strength', async (req, res) => {
   try {
     const { password } = req.body;
@@ -73,9 +134,9 @@ app.post('/api/check-strength', async (req, res) => {
     const normalizedPassword = password.trim().toLowerCase();
     const isCommon = commonPasswords.has(normalizedPassword);
     const result = zxcvbn(password);
+    const rarity = analyzePasswordRarity(password);
     const strengthLabel = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'][isCommon ? 0 : result.score];
 
-    // Meme feedback based on score
     const getMemeFeedback = (score, isCommon) => {
       if (isCommon) {
         return {
@@ -85,23 +146,23 @@ app.post('/api/check-strength', async (req, res) => {
       }
 
       const memes = [
-        { // Score 0 - Very Weak
+        {
           meme: 'memes/QoZunxgU0Z1i8.gif',
           text: 'Your password is weaker than my grandma\'s tea! ☕'
         },
-        { // Score 1 - Weak
+        {
           meme: 'memes/M2qCVgOKaSNLG.gif',
           text: 'This password wouldn\'t protect a chocolate from a toddler! 🍫'
         },
-        { // Score 2 - Fair
+        {
           meme: 'memes/3dkXFcZgXEu9noZQCE.gif',
           text: 'Not bad... but not great either. Like lukewarm coffee. ☕'
         },
-        { // Score 3 - Strong
+        {
           meme: 'memes/uim459G9DiGQXDv8zt.gif',
           text: 'Now we\'re talking! This password means business! 💼'
         },
-        { // Score 4 - Very Strong
+        {
           meme: 'memes/rCByhKpqKDZErtLDzm.gif',
           text: 'UNBREAKABLE! This password could guard the Crown Jewels! 👑'
         }
@@ -115,10 +176,12 @@ app.post('/api/check-strength', async (req, res) => {
     await PasswordTest.create({
       strengthScore: isCommon ? 0 : result.score,
       isCommon,
+      rarityScore: rarity.score,
       strengthLabel,
       feedback: isCommon ?
-        'Common password detected' :
-        result.feedback.suggestions.join(' ') || 'Good password!'
+      'Common password detected' :
+      result.feedback.suggestions.join(' ') || 'Good password!',
+                              rarityLabel: rarity.label
     });
 
     res.json({
@@ -126,10 +189,15 @@ app.post('/api/check-strength', async (req, res) => {
       score: isCommon ? 0 : result.score,
       isCommon,
       feedback: isCommon ?
-        'This password is too common and easily guessable' :
-        result.feedback.suggestions.join(' ') || 'Good password!',
-      meme: memeFeedback.meme,
-      memeText: memeFeedback.text
+      'This password is too common and easily guessable' :
+      result.feedback.suggestions.join(' ') || 'Good password!',
+             meme: memeFeedback.meme,
+             memeText: memeFeedback.text,
+             rarity: {
+               score: rarity.score,
+               label: rarity.label,
+               feedback: rarity.feedback
+             }
     });
 
   } catch (err) {
@@ -143,7 +211,7 @@ app.get('/api/history', async (req, res) => {
     const history = await PasswordTest.find()
     .sort({ testedAt: -1 })
     .limit(20)
-    .select('strengthScore isCommon testedAt strengthLabel feedback -_id');
+    .select('strengthScore isCommon testedAt strengthLabel feedback rarityScore rarityLabel -_id');
     res.json(history);
   } catch (err) {
     console.error('History fetch error:', err);
@@ -171,14 +239,24 @@ app.get('/api/admin/stats', async (req, res) => {
           { $group: { _id: "$strengthScore", count: { $sum: 1 } } },
           { $sort: { _id: 1 } }
         ]),
+        rarityDistribution: await PasswordTest.aggregate([
+          { $group: { _id: "$rarityScore", count: { $sum: 1 } } },
+          { $sort: { _id: 1 } }
+        ]),
         lastTests: await PasswordTest.find().sort({ testedAt: -1 }).limit(10)
     };
 
-    const distributionArray = [0, 0, 0, 0, 0];
+    const strengthDistributionArray = [0, 0, 0, 0, 0];
     stats.strengthDistribution.forEach(item => {
-      distributionArray[item._id] = item.count;
+      strengthDistributionArray[item._id] = item.count;
     });
-    stats.strengthDistribution = distributionArray;
+    stats.strengthDistribution = strengthDistributionArray;
+
+    const rarityDistributionArray = [0, 0, 0, 0, 0, 0];
+    stats.rarityDistribution.forEach(item => {
+      rarityDistributionArray[item._id] = item.count;
+    });
+    stats.rarityDistribution = rarityDistributionArray;
 
     res.json(stats);
   } catch (err) {
