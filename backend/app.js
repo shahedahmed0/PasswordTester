@@ -124,6 +124,63 @@ function analyzePasswordRarity(password) {
   return { score, label, feedback };
 }
 
+
+app.get('/api/generate-password', (req, res) => {
+  try {
+    const { length = 16, useNumbers = true, useSymbols = true } = req.query;
+    const parsedLength = Math.min(32, Math.max(8, parseInt(length) || 16));
+    
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    
+    let charset = lowercase + uppercase;
+    if (useNumbers === 'true' || useNumbers === true) charset += numbers;
+    if (useSymbols === 'true' || useSymbols === true) charset += symbols;
+    
+
+    let password = '';
+    if (useNumbers === 'true' || useNumbers === true) {
+      password += numbers[Math.floor(Math.random() * numbers.length)];
+    }
+    if (useSymbols === 'true' || useSymbols === true) {
+      password += symbols[Math.floor(Math.random() * symbols.length)];
+    }
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    
+
+    for (let i = password.length; i < parsedLength; i++) {
+      const randomIndex = Math.floor(Math.random() * charset.length);
+      password += charset[randomIndex];
+    }
+    
+
+    password = password.split('').sort(() => Math.random() - 0.5).join('');
+    
+
+    const result = zxcvbn(password);
+    const rarity = analyzePasswordRarity(password);
+    
+    res.json({
+      password,
+      strength: ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'][result.score],
+      score: result.score,
+      feedback: result.feedback.suggestions.join(' ') || 'Strong password!',
+      rarity: {
+        score: rarity.score,
+        label: rarity.label,
+        feedback: rarity.feedback
+      }
+    });
+    
+  } catch (err) {
+    console.error('Password generation error:', err);
+    res.status(500).json({ error: 'Failed to generate password' });
+  }
+});
+
 app.post('/api/check-strength', async (req, res) => {
   try {
     const { password } = req.body;

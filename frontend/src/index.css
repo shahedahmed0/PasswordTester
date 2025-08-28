@@ -130,3 +130,20 @@ body, html {
   font-weight: 900;
   font-style: italic;
 }
+
+input[type="range"] {
+  -webkit-appearance: none;
+  height: 8px;
+  background: #ddd;
+  border-radius: 4px;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #4CAF50;
+  border-radius: 50%;
+  cursor: pointer;
+}
