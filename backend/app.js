@@ -5,6 +5,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 
@@ -23,6 +25,54 @@ mongoose.connect(MONGO_URI, {
   process.exit(1);
 });
 
+
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100, 
+  message: {
+    error: 'Too many requests from this IP, please try again after 15 minutes.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: {
+    error: 'Too many login attempts, please try again after 15 minutes.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const passwordCheckLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: {
+    error: 'Too many password checks, please try again after 15 minutes.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: {
+    error: 'Too many admin requests, please try again after 15 minutes.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+
+app.use('/api/', generalLimiter); 
+app.use('/api/check-strength', passwordCheckLimiter);
+app.use('/api/login', authLimiter);
+app.use('/api/register', authLimiter);
+app.use('/api/admin', adminLimiter);
+
 const PasswordTestSchema = new mongoose.Schema({
   strengthScore: { type: Number, required: true },
   isCommon: Boolean,
@@ -37,8 +87,20 @@ const AdminTokenSchema = new mongoose.Schema({
   token: { type: String, unique: true }
 });
 
+const RateLimitSchema = new mongoose.Schema({
+  ip: { type: String, required: true },
+  endpoint: { type: String, required: true },
+  count: { type: Number, default: 1 },
+  lastRequest: { type: Date, default: Date.now },
+  expiresAt: { type: Date, required: true }
+});
+
+
+RateLimitSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
 const PasswordTest = mongoose.model('PasswordTest', PasswordTestSchema);
 const AdminToken = mongoose.model('AdminToken', AdminTokenSchema);
+const RateLimit = mongoose.model('RateLimit', RateLimitSchema);
 
 let commonPasswords = new Set();
 
@@ -125,7 +187,147 @@ function analyzePasswordRarity(password) {
 }
 
 
-app.get('/api/generate-password', (req, res) => {
+const customRateLimit = (windowMs, maxRequests) => {
+  return async (req, res, next) => {
+    const ip = req.ip || req.connection.remoteAddress;
+    const endpoint = req.path;
+    const now = Date.now();
+    const windowStart = new Date(now - windowMs);
+    
+    try {
+      let rateRecord = await RateLimit.findOne({ ip, endpoint });
+      
+      if (rateRecord) {
+        if (rateRecord.lastRequest < windowStart) {
+          rateRecord.count = 1;
+          rateRecord.lastRequest = now;
+          rateRecord.expiresAt = new Date(now + windowMs);
+          await rateRecord.save();
+          return next();
+        }
+        
+        if (rateRecord.count >= maxRequests) {
+          return res.status(429).json({ 
+            error: 'Too many requests, please try again later.',
+            retryAfter: Math.ceil((rateRecord.expiresAt - now) / 1000)
+          });
+        }
+        
+
+        rateRecord.count++;
+        rateRecord.lastRequest = now;
+        await rateRecord.save();
+      } else {
+        rateRecord = new RateLimit({
+          ip,
+          endpoint,
+          count: 1,
+          lastRequest: now,
+          expiresAt: new Date(now + windowMs)
+        });
+        await rateRecord.save();
+      }
+      
+      next();
+    } catch (error) {
+      console.error('Rate limit error:', error);
+      next();
+    }
+  };
+};
+
+app.post('/api/hash-simulation', customRateLimit(15 * 60 * 1000, 10), (req, res) => {
+  try {
+    const { password, algorithm = 'sha256', rounds = 5 } = req.body;
+    
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required' });
+    }
+
+    const validAlgorithms = ['sha256', 'sha512', 'md5'];
+    if (!validAlgorithms.includes(algorithm)) {
+      return res.status(400).json({ error: 'Invalid algorithm' });
+    }
+
+    const parsedRounds = Math.min(10, Math.max(1, parseInt(rounds) || 5));
+
+    const steps = [];
+    let currentValue = password;
+    
+    steps.push({
+      step: 0,
+      description: "Original password",
+      value: currentValue,
+      valueHex: bufferToHex(Buffer.from(currentValue)),
+      operation: "Input"
+    });
+
+    for (let i = 1; i <= parsedRounds; i++) {
+      const salt = i % 2 === 0 ? `s4l7_${i}_r0und` : '';
+      const operation = salt ? `Hash with salt (round ${i})` : `Hash (round ${i})`;
+      
+      const hash = crypto.createHash(algorithm);
+      hash.update(currentValue + salt);
+      currentValue = hash.digest('hex');
+      
+      steps.push({
+        step: i,
+        description: `After ${algorithm} hashing`,
+        value: currentValue,
+        valueHex: currentValue,
+        operation,
+        salt: salt || undefined
+      });
+    }
+
+    res.json({
+      originalPassword: password,
+      finalHash: currentValue,
+      algorithm,
+      rounds: parsedRounds,
+      steps,
+      securityExplanation: getSecurityExplanation(algorithm, parsedRounds)
+    });
+
+  } catch (err) {
+    console.error('Hashing simulation error:', err);
+    res.status(500).json({ error: 'Failed to simulate hashing' });
+  }
+});
+
+function bufferToHex(buffer) {
+  return Array.from(buffer)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function getSecurityExplanation(algorithm, rounds) {
+  const explanations = {
+    sha256: {
+      1: "Single SHA-256 hash is vulnerable to rainbow table attacks. Always use a salt!",
+      3: "Multiple rounds of SHA-256 provide better protection but still need salt.",
+      5: "Five rounds of SHA-256 with salting provides good protection against brute force attacks.",
+      10: "Ten rounds significantly increase the computational cost for attackers."
+    },
+    sha512: {
+      1: "SHA-512 produces a longer hash but still needs salt for protection.",
+      3: "Multiple rounds of SHA-512 with salting provide excellent security.",
+      5: "Five rounds of SHA-512 are very resistant to brute force attacks.",
+      10: "Ten rounds of SHA-512 provide enterprise-level security for sensitive data."
+    },
+    md5: {
+      1: "MD5 is cryptographically broken and unsuitable for password storage.",
+      3: "Even multiple rounds of MD5 cannot fix its fundamental vulnerabilities.",
+      5: "MD5 should never be used for password hashing in modern applications.",
+      10: "Despite multiple rounds, MD5 remains vulnerable to collision attacks."
+    }
+  };
+
+  return explanations[algorithm][rounds] || 
+    `Using ${algorithm} with ${rounds} rounds${rounds > 1 ? '' : ' (consider more rounds for better security)'}.`;
+}
+
+app.get('/api/generate-password', customRateLimit(15 * 60 * 1000, 15), (req, res) => {
   try {
     const { length = 16, useNumbers = true, useSymbols = true } = req.query;
     const parsedLength = Math.min(32, Math.max(8, parseInt(length) || 16));
@@ -263,7 +465,7 @@ app.post('/api/check-strength', async (req, res) => {
   }
 });
 
-app.get('/api/history', async (req, res) => {
+app.get('/api/history', customRateLimit(15 * 60 * 1000, 20), async (req, res) => {
   try {
     const history = await PasswordTest.find()
     .sort({ testedAt: -1 })

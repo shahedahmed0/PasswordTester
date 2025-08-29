@@ -67,34 +67,42 @@ export default function AdminDashboard() {
         setStats(null);
     };
 
+
+    const strengthColors = [
+        '#ff5252',
+        '#ff9800',
+        '#ffd740',
+        '#8bc34a',
+        '#4caf50'
+    ];
+
+    const rarityColors = [
+        '#f44336',
+        '#ff9800',
+        '#ffc107',
+        '#8bc34a',
+        '#4caf50',
+        '#2e7d32'
+    ];
+
     const strengthData = {
         labels: ['Very Weak (0)', 'Weak (1)', 'Fair (2)', 'Strong (3)', 'Very Strong (4)'],
         datasets: [{
             label: 'Number of Tests',
             data: stats?.strengthDistribution || [0, 0, 0, 0, 0],
-            backgroundColor: [
-                '#ff6384',
-                '#ff9f40',
-                '#ffcd56',
-                '#4bc0c0',
-                '#36a2eb'
-            ],
+            backgroundColor: strengthColors,
+            borderColor: strengthColors.map(color => color + 'DD'),
             borderWidth: 1
         }]
     };
 
     const rarityData = {
-        labels: ['Very Common (0)', 'Common (1)', 'Uncommon (2)', 'Rare (3)', 'Very Rare (4)'],
+        labels: ['Very Common (0)', 'Common (1)', 'Uncommon (2)', 'Rare (3)', 'Very Rare (4)', 'Extremely Rare (5)'],
         datasets: [{
             label: 'Number of Tests',
-            data: stats?.rarityDistribution || [0, 0, 0, 0, 0],
-            backgroundColor: [
-                '#f44336',
-                '#ff9800',
-                '#ffc107',
-                '#8bc34a',
-                '#4caf50'
-            ],
+            data: stats?.rarityDistribution || [0, 0, 0, 0, 0, 0],
+            backgroundColor: rarityColors,
+            borderColor: rarityColors.map(color => color + 'DD'),
             borderWidth: 1
         }]
     };
@@ -109,6 +117,17 @@ export default function AdminDashboard() {
             title: {
                 display: true,
                 text: 'Password Distribution'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const label = context.label || '';
+                        const value = context.raw || 0;
+                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                        const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
+                        return `${label}: ${value} (${percentage}%)`;
+                    }
+                }
             }
         },
         scales: {
@@ -121,10 +140,20 @@ export default function AdminDashboard() {
         }
     };
 
+    const doughnutOptions = {
+        ...chartOptions,
+        plugins: {
+            ...chartOptions.plugins,
+            legend: {
+                position: 'bottom',
+            }
+        }
+    };
+
     if (!isAuthenticated) {
         return (
             <div style={{
-                backgroundImage: "url('/images/background2.jpg')",
+                backgroundImage: "url('/images/background2.gif')",
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundAttachment: 'fixed',
@@ -189,7 +218,7 @@ export default function AdminDashboard() {
 
     return (
         <div style={{
-            backgroundImage: "url('/images/background2.jpg')",
+            backgroundImage: "url('/images/background2.gif')",
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundAttachment: 'fixed',
@@ -329,7 +358,7 @@ export default function AdminDashboard() {
                   height: '400px'
                     }}>
                     <h3 style={{ color: '#2c3e50', marginTop: '0', marginBottom: '20px' }}>Password Rarity Distribution</h3>
-                    <Doughnut data={rarityData} options={chartOptions} />
+                    <Doughnut data={rarityData} options={doughnutOptions} />
                     </div>
                     </div>
 
@@ -358,10 +387,26 @@ export default function AdminDashboard() {
                             {new Date(test.testedAt).toLocaleString()}
                             </td>
                             <td style={{ padding: '12px', border: '1px solid #ddd' }}>
+                            <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                color: 'white',
+                                backgroundColor: strengthColors[test.strengthScore] || '#666',
+                                fontWeight: 'bold'
+                            }}>
                             {test.strengthLabel} ({test.strengthScore}/4)
+                            </span>
                             </td>
                             <td style={{ padding: '12px', border: '1px solid #ddd' }}>
+                            <span style={{
+                                padding: '4px 8px',
+                                borderRadius: '4px',
+                                color: 'white',
+                                backgroundColor: rarityColors[test.rarityScore] || '#666',
+                                fontWeight: 'bold'
+                            }}>
                             {test.rarityLabel} ({test.rarityScore}/5)
+                            </span>
                             </td>
                             <td style={{ padding: '12px', border: '1px solid #ddd' }}>
                             {test.isCommon ?

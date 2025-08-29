@@ -1,174 +1,259 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 
-export default function HashSimulation({ password }) {
-  const [hashData, setHashData] = useState(null);
-  const [loading, setLoading] = useState(false);
+const HashSimulation = () => {
+  const [password, setPassword] = useState('');
+  const [algorithm, setAlgorithm] = useState('sha256');
+  const [rounds, setRounds] = useState(5);
+  const [result, setResult] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
 
-  useEffect(() => {
-    if (password && password.length > 0) {
-      simulateHashing();
-    }
-  }, [password]);
-
-  const simulateHashing = async () => {
-    setLoading(true);
-    setHashData(null);
+  const simulateHashing = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
     setCurrentStep(0);
     
     try {
-      const response = await axios.get('http://localhost:5000/api/hash-simulation', {
-        params: { password }
+      const response = await axios.post('http://localhost:5000/api/hash-simulation', {
+        password,
+        algorithm,
+        rounds
       });
-      setHashData(response.data);
       
+      setResult(response.data);
+      setIsLoading(false);
       
-      if (response.data.hashResult.steps.length > 0) {
-        let step = 0;
-        const interval = setInterval(() => {
-          setCurrentStep(step);
-          step++;
-          if (step > response.data.hashResult.steps.length) {
-            clearInterval(interval);
-          }
-        }, 800);
+      if (response.data.steps) {
+        for (let i = 0; i <= response.data.steps.length; i++) {
+          setTimeout(() => {
+            setCurrentStep(i);
+          }, i * 800);
+        }
       }
     } catch (err) {
-      console.error('Hash simulation error:', err);
+      alert('Error simulating hash: ' + (err.response?.data?.error || err.message));
+      setIsLoading(false);
     }
-    setLoading(false);
   };
 
-  if (!password) return null;
+  const renderStep = (step, index) => {
+    const isActive = index <= currentStep;
+    const isCurrent = index === currentStep;
+    
+    return (
+      <div
+        key={index}
+        style={{
+          padding: '15px',
+          margin: '10px 0',
+          border: '1px solid #ddd',
+          borderRadius: '5px',
+          backgroundColor: isCurrent ? '#e8f5e9' : isActive ? '#f1f8e9' : '#f9f9f9',
+          transition: 'all 0.5s ease',
+          opacity: isActive ? 1 : 0.6,
+          transform: isCurrent ? 'scale(1.02)' : 'scale(1)'
+        }}
+      >
+        <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+          Step {step.step}: {step.operation}
+          {isCurrent && isLoading && <span style={{marginLeft: '10px'}}>⏳</span>}
+        </div>
+        
+        {step.salt && (
+          <div style={{ marginBottom: '8px' }}>
+            <strong>Salt:</strong> {step.salt}
+          </div>
+        )}
+        
+        <div style={{ 
+          fontFamily: 'monospace', 
+          fontSize: '14px',
+          wordBreak: 'break-all',
+          backgroundColor: '#263238',
+          color: '#eceff1',
+          padding: '10px',
+          borderRadius: '4px'
+        }}>
+          {step.valueHex}
+        </div>
+        
+        {step.value !== step.valueHex && (
+          <div style={{ marginTop: '8px', fontSize: '14px', color: '#666' }}>
+            Original: {step.value}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div style={{
-      background: 'rgba(255, 255, 255, 0.95)',
       padding: '20px',
-      borderRadius: '10px',
-      marginTop: '20px',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-      border: '1px solid #e0e0e0'
+      maxWidth: '800px',
+      margin: '0 auto'
     }}>
-      <h4 style={{ 
-        borderBottom: '2px solid #2196F3', 
-        paddingBottom: '8px',
-        color: '#2c3e50'
-      }}>
-        🔒 Hashing Simulation
-      </h4>
-      
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <div style={{ 
-            fontSize: '24px', 
-            marginBottom: '10px' 
-          }}>
-            ⏳
-          </div>
-          <p>Simulating secure hashing...</p>
-        </div>
-      ) : hashData && (
-        <div>
-          <div style={{ 
-            background: '#e8f5e8', 
-            padding: '10px', 
-            borderRadius: '4px', 
-            marginBottom: '15px',
-            borderLeft: '4px solid #4CAF50'
-          }}>
-            <strong>Original Password:</strong> 
-            <span style={{ 
-              fontFamily: 'monospace', 
-              background: '#fff', 
-              padding: '2px 6px', 
-              borderRadius: '3px', 
-              marginLeft: '8px',
-              border: '1px solid #ddd'
-            }}>
-              {hashData.originalPassword}
-            </span>
-          </div>
+      <h2>Hashing Simulation</h2>
+      <p style={{ color: '#666', marginBottom: '20px' }}>
+        See how password hashing works step-by-step. This is a simulation for educational purposes only.
+      </p>
 
-          <div style={{ marginBottom: '15px' }}>
-            <strong>Hashing Process:</strong>
-            <div style={{ 
-              background: '#f5f5f5', 
-              padding: '10px', 
-              borderRadius: '4px', 
-              marginTop: '8px',
-              fontFamily: 'monospace',
-              fontSize: '12px',
-              maxHeight: '150px',
-              overflowY: 'auto'
-            }}>
-              {hashData.hashResult.steps.slice(0, currentStep).map((step, index) => (
-                <div key={index} style={{ 
-                  marginBottom: '10px', 
-                  padding: '8px',
-                  background: index === currentStep - 1 ? '#e3f2fd' : 'transparent',
-                  borderRadius: '3px',
-                  borderLeft: index === currentStep - 1 ? '3px solid #2196F3' : 'none'
-                }}>
-                  <div style={{ color: '#666', fontSize: '11px' }}>
-                    Round {step.round}: {step.operation}
-                  </div>
-                  <div style={{ marginTop: '4px' }}>
-                    <span style={{ color: '#e91e63' }}>Input:</span> {step.input}
-                  </div>
-                  <div>
-                    <span style={{ color: '#4CAF50' }}>Output:</span> {step.output}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {currentStep > hashData.hashResult.steps.length && (
-            <div style={{ 
-              background: '#4CAF50', 
-              color: 'white', 
-              padding: '12px', 
+      <form onSubmit={simulateHashing} style={{ marginBottom: '30px' }}>
+        <div style={{ marginBottom: '15px' }}>
+          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+            Password to Hash:
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px',
+              border: '1px solid #ddd',
               borderRadius: '4px',
+              fontSize: '16px'
+            }}
+            required
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '15px' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Algorithm:
+            </label>
+            <select
+              value={algorithm}
+              onChange={(e) => setAlgorithm(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '16px'
+              }}
+            >
+              <option value="sha256">SHA-256</option>
+              <option value="sha512">SHA-512</option>
+              <option value="md5">MD5 (Insecure - for demonstration only)</option>
+            </select>
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+              Rounds:
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={rounds}
+              onChange={(e) => setRounds(parseInt(e.target.value) || 1)}
+              style={{
+                width: '100%',
+                padding: '10px',
+                border: '1px solid #ddd',
+                borderRadius: '4px',
+                fontSize: '16px'
+              }}
+            />
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          style={{
+            width: '100%',
+            padding: '12px',
+            background: isLoading ? '#ccc' : '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: isLoading ? 'not-allowed' : 'pointer',
+            fontSize: '16px',
+            fontWeight: 'bold'
+          }}
+        >
+          {isLoading ? 'Simulating...' : 'Start Hashing Simulation'}
+        </button>
+      </form>
+
+      {result && (
+        <div>
+          <h3>Hashing Process</h3>
+          <div style={{
+            padding: '15px',
+            backgroundColor: '#e3f2fd',
+            borderRadius: '5px',
+            marginBottom: '20px',
+            borderLeft: '4px solid #2196f3'
+          }}>
+            <strong>Security Note:</strong> {result.securityExplanation}
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            {result.steps.slice(0, currentStep + 1).map((step, index) => 
+              renderStep(step, index)
+            )}
+          </div>
+
+          {currentStep >= result.steps.length - 1 && (
+            <div style={{
+              padding: '20px',
+              backgroundColor: '#4caf50',
+              color: 'white',
+              borderRadius: '5px',
               textAlign: 'center'
             }}>
-              <div style={{ fontSize: '18px', marginBottom: '5px' }}>✅</div>
-              <strong>Final Hash:</strong>
+              <h3>Final Hash</h3>
               <div style={{ 
                 fontFamily: 'monospace', 
-                background: 'rgba(255,255,255,0.2)', 
-                padding: '8px', 
-                borderRadius: '3px', 
-                marginTop: '8px',
+                fontSize: '14px',
                 wordBreak: 'break-all',
-                fontSize: '11px'
+                backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                padding: '15px',
+                borderRadius: '4px',
+                margin: '10px 0'
               }}>
-                {hashData.hashResult.finalHash}
+                {result.finalHash}
               </div>
-              <p style={{ margin: '10px 0 0 0', fontSize: '12px', opacity: 0.9 }}>
-                This simulated hash would be stored instead of your actual password
+              <p>
+                Algorithm: <strong>{result.algorithm.toUpperCase()}</strong> | 
+                Rounds: <strong>{result.rounds}</strong>
               </p>
             </div>
           )}
+        </div>
+      )}
 
-          <button
-            onClick={simulateHashing}
-            style={{
-              width: '100%',
-              padding: '8px',
-              background: '#2196F3',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px'
-            }}
-          >
-            🔁 Re-run Simulation
-          </button>
+      {!result && !isLoading && (
+        <div style={{
+          padding: '20px',
+          backgroundColor: '#f5f5f5',
+          borderRadius: '5px',
+          textAlign: 'center',
+          color: '#666'
+        }}>
+          <h3>How Password Hashing Works</h3>
+          <p>
+            Password hashing converts your password into a fixed-length string of characters
+            using a mathematical algorithm. This process is:
+          </p>
+          <ul style={{ textAlign: 'left', maxWidth: '500px', margin: '0 auto' }}>
+            <li><strong>One-way:</strong> You can't reverse the hash to get the original password</li>
+            <li><strong>Deterministic:</strong> The same password always produces the same hash</li>
+            <li><strong>Unique:</strong> Small changes create completely different hashes</li>
+          </ul>
+          <p style={{ marginTop: '15px' }}>
+            Modern systems add "salt" (random data) to passwords before hashing to prevent
+            rainbow table attacks.
+          </p>
         </div>
       )}
     </div>
   );
-}
+};
+
+export default HashSimulation;

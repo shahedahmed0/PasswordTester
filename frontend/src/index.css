@@ -16,11 +16,11 @@
 body, html {
   margin: 0;
   padding: 0;
-  overflow-x: hidden; /* Prevents horizontal scroll */
+  overflow-x: hidden;
 }
 
 * {
-  box-sizing: border-box; /* Ensures padding doesn't affect width */
+  box-sizing: border-box;
 }
 
 .poppins-thin {
@@ -146,4 +146,33 @@ input[type="range"]::-webkit-slider-thumb {
   background: #4CAF50;
   border-radius: 50%;
   cursor: pointer;
+}
+
+.hash-step {
+  transition: all 0.5s ease;
+}
+
+.hash-value {
+  font-family: monospace;
+  background-color: #263238;
+  color: #eceff1;
+  padding: 10px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.security-note {
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196f3;
+  padding: 15px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+}
+
+.final-hash {
+  background-color: #4caf50;
+  color: white;
+  padding: 20px;
+  border-radius: 5px;
+  text-align: center;
 }

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import PasswordHistory from './PasswordHistory';
 import PasswordGenerator from './PasswordGenerator';
+import HashSimulation from './HashSimulation';
 
 export default function PasswordTester() {
     const [password, setPassword] = useState('');
@@ -65,7 +66,7 @@ export default function PasswordTester() {
 
     return (
         <div style={{
-            backgroundImage: "url('/images/background1.jpg')",
+            backgroundImage: "url('/images/background1.gif')",
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundAttachment: 'fixed',
@@ -101,7 +102,8 @@ export default function PasswordTester() {
                     display: 'flex', 
                     marginBottom: '20px', 
                     borderBottom: '2px solid #eee',
-                    borderRadius: '4px 4px 0 0'
+                    borderRadius: '4px 4px 0 0',
+                    flexWrap: 'wrap'
                 }}>
                     <button
                         onClick={() => setActiveTab('tester')}
@@ -132,6 +134,21 @@ export default function PasswordTester() {
                         }}
                     >
                         ✨ Generate Password
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('simulation')}
+                        style={{
+                            padding: '12px 24px',
+                            background: activeTab === 'simulation' ? '#FF9800' : 'transparent',
+                            color: activeTab === 'simulation' ? 'white' : '#666',
+                            border: 'none',
+                            cursor: 'pointer',
+                            borderRadius: '4px 4px 0 0',
+                            fontWeight: 'bold',
+                            transition: 'all 0.3s ease'
+                        }}
+                    >
+                        🔐 Hashing Simulation
                     </button>
                 </div>
 
@@ -308,8 +325,10 @@ export default function PasswordTester() {
                             </div>
                         )}
                     </div>
-                ) : (
+                ) : activeTab === 'generator' ? (
                     <PasswordGenerator onPasswordGenerated={(password) => setPassword(password)} />
+                ) : (
+                    <HashSimulation />
                 )}
 
                 <PasswordHistory />
